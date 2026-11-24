@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Robot walk timeline</title>
+<style>
+:root{color-scheme:light dark;--bg:light-dark(#f6f1e7,#1c1a17);--ink:light-dark(#2c2c2a,#f1efe8);--mute:light-dark(#6b6a65,#a8a69e);--chip:light-dark(#ebe5d8,#2a2824);--line:light-dark(#c9c4b8,#4a4842);--hot:#d85a30}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;font-weight:600;margin:0 0 12px}
+.stage{background:#fffdf6;border:1px solid #b4b2a9;border-radius:12px;overflow:hidden}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+button,select{font:inherit;font-size:14px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 12px;min-height:36px;cursor:pointer}
+button:hover{background:var(--chip)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+.mute{font-size:14px;color:var(--mute)}
+#lb{font-size:14px;font-weight:600;margin-left:auto}
+#tl{width:100%;margin-top:12px;cursor:pointer;touch-action:none;display:block}
+#segs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.seg{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--chip);border-radius:8px;padding:6px 8px}
+.seg button{min-width:32px;padding:2px 8px}
+.seg b{min-width:20px;text-align:center;font-size:14px}
+</style>
+</head>
+<body>
+<main>
+<h1>Robot walk timeline</h1>
+<div class="stage">
+<svg width="100%" viewBox="0 0 680 300" role="img" aria-label="Robot posed from the timeline">
+<defs><filter id="boil" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence id="tb" type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="1"/><feDisplacementMap in="SourceGraphic" scale="3.5"/></filter></defs>
+<line x1="0" y1="278" x2="680" y2="278" stroke="#888780" stroke-width="2"/>
+<g id="gd"></g><g id="rb"></g>
+</svg>
+</div>
+<div class="row">
+<button id="pp" aria-label="Pause">Pause</button>
+<button id="pv" aria-label="Previous frame">◀ Frame</button>
+<button id="nx" aria-label="Next frame">Frame ▶</button>
+<select id="tm" aria-label="Timing"><option value="1">On ones</option><option value="2" selected>On twos</option><option value="3">On threes</option></select>
+<select id="ez" aria-label="Spacing"><option value="lin">Even spacing</option><option value="io" selected>Slow in, slow out</option></select>
+<label class="mute" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="bo" checked>Line boil</label>
+<span id="lb"></span>
+</div>
+<svg id="tl" viewBox="0 0 680 64" role="img" aria-label="Timeline: click or drag to scrub"></svg>
+<div class="row" style="margin-bottom:8px">
+<span class="mute">Frames between keys</span>
+<button id="allm" aria-label="Fewer frames everywhere">All −</button><button id="allp" aria-label="More frames everywhere">All +</button>
+</div>
+<div id="segs"></div>
+</main>
+<script>
+{
+const O='#2C2C2A',M='#B4B2A9',D='#888780',HI='#F1EFE8',CX=62;
+const K=[
+{n:'Contact',by:118,sx:1,sy:1,nf:[28,172,-20],ff:[-26,170,25],nh:-22,fh:22,hd:0,ant:0},
+{n:'Down',by:125,sx:1.1,sy:.88,nf:[16,172,0],ff:[-24,160,35],nh:-12,fh:12,hd:-4,ant:6},
+{n:'Passing',by:116,sx:1,sy:1,nf:[0,172,0],ff:[4,150,10],nh:0,fh:0,hd:-1,ant:3},
+{n:'Up',by:109,sx:.94,sy:1.1,nf:[-18,170,30],ff:[24,156,-15],nh:12,fh:-12,hd:4,ant:-6}];
+const F=[...K,...K.map(q=>({...q,nf:q.ff,ff:q.nf,nh:q.fh,fh:q.nh}))];
+const gaps=[4,4,4,4,4,4,4,4];
+const leg=(hx,hy,f,c)=>{const fx=CX+f[0],fy=f[1],d=Math.hypot(fx-hx,fy-hy),b=4+Math.max(0,54-d)*0.9,mx=(hx+fx)/2+b,my=(hy+fy)/2,p=`M${hx} ${hy}Q${mx} ${my} ${fx} ${fy}`;
+return`<path d="${p}" fill="none" stroke="${O}" stroke-width="10" stroke-linecap="round"/><path d="${p}" fill="none" stroke="${c}" stroke-width="5" stroke-linecap="round"/><g transform="translate(${fx} ${fy}) rotate(${f[2]})"><path d="M-10 8Q-10 -4 2 -3Q18 -2 18 8Z" fill="${c}" stroke="${O}" stroke-width="3" stroke-linejoin="round"/></g>`};
+const arm=(sx,sy,sw,c)=>{const hx=sx+sw,hy=sy+30,mx=(sx+hx)/2-6,my=(sy+hy)/2+2,p=`M${sx} ${sy}Q${mx} ${my} ${hx} ${hy}`;
+return`<path d="${p}" fill="none" stroke="${O}" stroke-width="8" stroke-linecap="round"/><path d="${p}" fill="none" stroke="${c}" stroke-width="3.5" stroke-linecap="round"/><circle cx="${hx}" cy="${hy}" r="7" fill="#fff" stroke="${O}" stroke-width="3"/>`};
+function robot(q){const by=q.by,hip=by+18,hy=by-50+q.hd;let s='';
+s+=arm(CX-4,by-12,q.fh,D)+leg(CX-4,hip,q.ff,D);
+s+=`<g transform="translate(${CX} ${by}) scale(${q.sx} ${q.sy})"><rect x="-21" y="-24" width="42" height="48" rx="13" fill="${M}" stroke="${O}" stroke-width="3.5"/><rect x="-12" y="-12" width="20" height="16" rx="4" fill="${HI}" stroke="${O}" stroke-width="2.5"/><circle cx="-5" cy="-4" r="2.5" fill="#E24B4A"/><circle cx="3" cy="-4" r="2.5" fill="#639922"/></g>`;
+s+=leg(CX+4,hip,q.nf,M);
+s+=`<path d="M${CX} ${by-24*q.sy}L${CX} ${hy+14}" stroke="${O}" stroke-width="6"/><path d="M${CX} ${by-24*q.sy}L${CX} ${hy+14}" stroke="${D}" stroke-width="2.5"/>`;
+s+=`<g transform="translate(${CX+2} ${hy})"><path d="M0 -16Q${q.ant/2} -26 ${q.ant} -32" fill="none" stroke="${O}" stroke-width="2.5"/><circle cx="${q.ant}" cy="-34" r="4.5" fill="#E24B4A" stroke="${O}" stroke-width="2.5"/><rect x="-22" y="-17" width="44" height="32" rx="9" fill="${M}" stroke="${O}" stroke-width="3.5"/><ellipse cx="6" cy="-3" rx="6" ry="8" fill="#fff" stroke="${O}" stroke-width="2.5"/><ellipse cx="17" cy="-3" rx="5" ry="7.5" fill="#fff" stroke="${O}" stroke-width="2.5"/><circle cx="8.5" cy="-2" r="2.5" fill="${O}"/><circle cx="19" cy="-2" r="2.3" fill="${O}"/><path d="M4 8Q12 12 20 7" fill="none" stroke="${O}" stroke-width="2.5" stroke-linecap="round"/><rect x="-26" y="-6" width="5" height="10" rx="2" fill="${D}" stroke="${O}" stroke-width="2"/></g>`;
+s+=arm(CX+5,by-13,q.nh,M);return s}
+const L=(a,b,t)=>Array.isArray(a)?a.map((v,j)=>v+(b[j]-v)*t):typeof a==='number'?a+(b-a)*t:a;
+const lerpPose=(a,b,t)=>{const o={};for(const k in a)o[k]=L(a[k],b[k],t);return o};
+const $=id=>document.getElementById(id);
+const rb=$('rb'),gd=$('gd'),tb=$('tb'),lb=$('lb'),tl=$('tl'),segs=$('segs'),pp=$('pp'),tm=$('tm'),ez=$('ez'),bo=$('bo');
+let f=0,play=true,shown=-1;
+const total=()=>gaps.reduce((a,b)=>a+b,0);
+const starts=()=>{let s=0;return gaps.map(g=>{const v=s;s+=g;return v})};
+function poseAt(fr){const st=starts();let s=7;for(let j=0;j<8;j++)if(fr<st[j]+gaps[j]){s=j;break}
+let t=(fr-st[s])/gaps[s];if(ez.value==='io')t=t*t*(3-2*t);
+return{q:lerpPose(F[s],F[(s+1)%8],t),s,t,key:fr===st[s]}}
+function render(){const N=total();const hold=+tm.value;const df=f-(f%hold);
+const {q,s,t,key}=poseAt(df);
+if(df!==shown){shown=df;tb.setAttribute('seed',String(df*5+3));
+rb.innerHTML=`<g ${bo.checked?'filter="url(#boil)"':''} transform="translate(241 -7) scale(1.6)">${robot(q)}</g>`;
+let g='',off=((s+t)*22)%90;for(let x=-off;x<700;x+=90)g+=`<path d="M${x} 290l26 0M${x+40} 298l14 0" stroke="#B4B2A9" stroke-width="2" stroke-linecap="round"/>`;gd.innerHTML=g}
+lb.textContent=`Frame ${f+1} of ${N}${key&&df===f?' · key '+(s+1)+' '+F[s].n:''}`;
+const st=starts(),X=fr=>20+fr/N*640;let h=`<rect x="20" y="22" width="640" height="20" rx="4" fill="var(--chip)"/>`;
+for(let i=0;i<N;i++){const x=X(i);h+=`<line x1="${x}" y1="${i%hold===0?26:32}" x2="${x}" y2="38" stroke="var(--line)" stroke-width="1"/>`}
+st.forEach((v,j)=>{const x=X(v);h+=`<path d="M${x} 25l7 7-7 7-7-7z" fill="${j===s&&key?'#D85A30':'#888780'}"/><text x="${x}" y="15" text-anchor="middle" font-size="12" fill="var(--mute)">${j+1}</text>`});
+const px=X(f+.5);h+=`<line x1="${px}" y1="18" x2="${px}" y2="46" stroke="#D85A30" stroke-width="2"/><text x="20" y="60" font-size="12" fill="var(--mute)">Loop: ${(N/24).toFixed(2)} s at 24 fps</text>`;
+tl.innerHTML=h}
+function buildSegs(){segs.innerHTML=gaps.map((g,j)=>`<div class="seg"><span class="mute">${j+1} → ${(j+1)%8+1}</span><span style="display:flex;align-items:center;gap:4px"><button data-j="${j}" data-d="-1" aria-label="Fewer frames ${j+1} to ${(j+1)%8+1}">−</button><b>${g}</b><button data-j="${j}" data-d="1" aria-label="More frames ${j+1} to ${(j+1)%8+1}">+</button></span></div>`).join('')}
+function changed(){f=Math.min(f,total()-1);shown=-1;buildSegs();render()}
+segs.onclick=e=>{const b=e.target.closest('button');if(!b)return;const j=+b.dataset.j;gaps[j]=Math.max(1,Math.min(24,gaps[j]+ +b.dataset.d));changed()};
+$('allm').onclick=()=>{for(let j=0;j<8;j++)gaps[j]=Math.max(1,gaps[j]-1);changed()};
+$('allp').onclick=()=>{for(let j=0;j<8;j++)gaps[j]=Math.min(24,gaps[j]+1);changed()};
+const setPlay=v=>{play=v;pp.textContent=play?'Pause':'Play';pp.setAttribute('aria-label',play?'Pause':'Play')};
+pp.onclick=()=>setPlay(!play);
+$('nx').onclick=()=>{setPlay(false);f=(f+1)%total();render()};
+$('pv').onclick=()=>{setPlay(false);f=(f-1+total())%total();render()};
+tm.onchange=()=>{shown=-1;render()};ez.onchange=()=>{shown=-1;render()};bo.onchange=()=>{shown=-1;render()};
+const scrub=e=>{const r=tl.getBoundingClientRect();const x=(e.clientX-r.left)/r.width*680;const N=total();f=Math.max(0,Math.min(N-1,Math.floor((x-20)/640*N)));setPlay(false);render()};
+let drag=false;tl.onpointerdown=e=>{drag=true;tl.setPointerCapture(e.pointerId);scrub(e)};tl.onpointermove=e=>{if(drag)scrub(e)};tl.onpointerup=()=>drag=false;
+setInterval(()=>{if(!play)return;f=(f+1)%total();render()},1000/24);
+buildSegs();render();
+}
+</script>
+</body>
+</html>
